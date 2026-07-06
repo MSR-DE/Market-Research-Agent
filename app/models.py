@@ -1,0 +1,35 @@
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.orm import declarative_base
+from datetime import datetime 
+from pgvector.sqlalchemy import Vector
+
+Base = declarative_base()
+
+class Article(Base):
+    __tablename__ = "articles"
+    
+    id = Column(Integer, primary_key=True)
+
+    title = Column(String, nullable=False) ## Nullable = false because all articles need titles
+
+    source_name = Column(String, nullable=False) ## will add filter/weight as to how reliable a source is
+
+    published_date = Column(DateTime, nullable=False) ## help filter for recent news/freshness
+
+    url = Column(String, nullable=True) ## not essential but nice to have
+
+
+###--------------------------###
+
+class Chunk(Base):
+    __tablename__ = "chunks"
+
+    id = Column(Integer, primary_key=True)
+
+
+
+
+
+
+
+    
