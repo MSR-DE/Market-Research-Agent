@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
 from sqlalchemy.orm import declarative_base
 from datetime import datetime 
 from pgvector.sqlalchemy import Vector
@@ -25,8 +25,10 @@ class Chunk(Base):
     __tablename__ = "chunks"
 
     id = Column(Integer, primary_key=True)
-
-
+    article_id = Column(Integer, ForeignKey("articles.id"),nullable=False) ## article.id refers to the table above 'article'
+    chunk_text = Column(Text, nullable=False)
+    embedding = Column(Vector(768), nullable=False)
+    sentiment_score = Column(Float, nullable=True)
 
 
 
