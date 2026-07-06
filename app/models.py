@@ -27,7 +27,7 @@ class Chunk(Base):
     id = Column(Integer, primary_key=True)
     article_id = Column(Integer, ForeignKey("articles.id"),nullable=False) ## article.id refers to the table above 'article'
     chunk_text = Column(Text, nullable=False)
-    embedding = Column(Vector(768), nullable=False)
+    embedding = Column(Vector(3072), nullable=False)
     sentiment_score = Column(Float, nullable=True)
 
 
