@@ -30,7 +30,7 @@ class Chunk(Base):
     embedding = Column(Vector(3072), nullable=False)
     sentiment_score = Column(Float, nullable=True)
 
-
+    
 
 
 
