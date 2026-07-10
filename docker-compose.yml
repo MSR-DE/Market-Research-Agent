@@ -1,0 +1,18 @@
+version: "3.9"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16 # pg = postgreSQL 
+    container_name: market-research-db
+    restart: always               # auto-restart everytime it crashes 
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: market_research
+    ports:
+      - "5432:5432"  ## 5432 is the standard default for postgre like how 80 is for HTTP
+    volumes:
+      - pgdata:/var/lib/postgresql/data # persist data outside the container so it survives restarts
+
+volumes:
+  pgdata:
