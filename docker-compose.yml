@@ -14,5 +14,14 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data # persist data outside the container so it survives restarts
 
+  redis:
+    image: redis:8.8.0 
+    container_name: market-research-redis
+    restart: always               # auto-restart everytime it crashes 
+    ports:
+      - "6379:6379"  ## 6379 is the standard default for redis like how 80 is for HTTP and 5432 for postgres
+
+                      # redis doesnt need persistant volume becasue its a message broker not a data storer or somthign
+
 volumes:
   pgdata:
