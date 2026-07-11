@@ -1,0 +1,82 @@
+from google.genai import types
+from app.ingestion.embedder import client
+from app.tools.rag_search import hybrid_search_reranked
+import time
+
+
+search_tool_declaration = {
+    "name": "search_news",
+    "description": "Search stored financial news articles for information relevant to a query. Use this when you need factual information about companies, markets, or events to answer the user's question.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "The search query, e.g. 'Apple earnings' or 'Federal Reserve interest rates'"
+            }
+        },
+        "required": ["query"]
+    }
+}
+
+tool = types.Tool(function_declarations=[search_tool_declaration])
+
+# maps tool NAME (as the model will refer to it) to the ACTUAL function that runs it
+available_tools = {
+    "search_news": lambda query: hybrid_search_reranked(query)
+}
+
+def run_agent(user_query, max_iterations=5):
+    contents = [{"role": "user", "parts": [{"text": user_query}]}]
+
+    for i in range(max_iterations):
+        time.sleep(25)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(tools=[tool])
+        )
+
+        part = response.candidates[0].content.parts[0]
+
+        # CASE 1: the model wants to call a tool
+        if part.function_call:
+            fn_name = part.function_call.name
+            fn_args = dict(part.function_call.args)
+
+            print(f"[Agent] Calling tool: {fn_name}({fn_args})")
+            tool_result = available_tools[fn_name](**fn_args)
+
+            # summarize chunk objects into plain text the model can read back
+            result_text = "\n".join(chunk.chunk_text for chunk in tool_result)
+
+            # add the model's tool-call request AND the tool's result to the conversation
+            contents.append(response.candidates[0].content)
+            contents.append({
+                "role": "user",
+                "parts": [{
+                    "function_response": {
+                        "name": fn_name,
+                        "response": {"result": result_text}
+                    }
+                }]
+            })
+            # loop again, model gets another turn, now with the search results
+
+
+        # CASE 2: the model gave a final answer, no tool call needed
+        else:
+            return part.text
+
+    return "Reached max iterations without a final answer."
+
+
+if __name__ == "__main__":
+    answer = run_agent("How is Apple's stock performing based on recent news?")
+    print("\nFinal answer:", answer)
+
+
+
+
+
+ 

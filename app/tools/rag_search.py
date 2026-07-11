@@ -3,7 +3,7 @@ from app.models import Chunk
 from app.ingestion.embedder import embed_text
 from sqlalchemy import text
 from app.ingestion.embedder import client
-
+import time
 
 
 ## cosine search
@@ -92,8 +92,9 @@ def rerank(query, chunks, top_n=5):
     Return ONLY a comma-separated list of chunk numbers, most relevant first. No explanation.
 
     {chunk_list}"""
+    time.sleep(25)   
 
-    response = client.models.generate_content(model="gemini-3.5-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
 
     order = [int(i.strip()) for i in response.text.strip().split(",")]
     rerank = [chunks[i] for i in order if i<len(chunks)]
