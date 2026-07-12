@@ -1,7 +1,11 @@
 from google.genai import types
 from app.ingestion.embedder import client
 from app.tools.rag_search import hybrid_search_reranked
-import time
+import logging
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
+from google.api_core.exceptions import ResourceExhausted
+
+logger = logging.getLogger(__name__)
 
 
 search_tool_declaration = {
@@ -26,16 +30,26 @@ available_tools = {
     "search_news": lambda query: hybrid_search_reranked(query)
 }
 
+@retry(
+    retry=retry_if_exception_type(ResourceExhausted),
+    wait=wait_exponential(multiplier=2, min=2, max=120),
+    stop=stop_after_attempt(8),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def _agent_generate(contents, tools):
+    """Wrapper so tenacity handles the 429s instead of a blind sleep."""
+    return client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=contents,
+        config=types.GenerateContentConfig(tools=tools)
+    )
+
 def run_agent(user_query, max_iterations=5):
     contents = [{"role": "user", "parts": [{"text": user_query}]}]
 
     for i in range(max_iterations):
-        time.sleep(25)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=types.GenerateContentConfig(tools=[tool])
-        )
+        response = _agent_generate(contents, [tool])
 
         part = response.candidates[0].content.parts[0]
 
@@ -45,10 +59,17 @@ def run_agent(user_query, max_iterations=5):
             fn_args = dict(part.function_call.args)
 
             print(f"[Agent] Calling tool: {fn_name}({fn_args})")
-            tool_result = available_tools[fn_name](**fn_args)
+            
 
-            # summarize chunk objects into plain text the model can read back
-            result_text = "\n".join(chunk.chunk_text for chunk in tool_result)
+            if fn_name not in available_tools:
+                tool_result_text = f"Error: tool '{fn_name}' does not exist."
+            else:
+                try:
+                    tool_result = available_tools[fn_name](**fn_args)
+                    tool_result_text = "\n".join(chunk.chunk_text for chunk in tool_result)
+                except Exception as e:
+                    tool_result_text = f"Error running tool: {str(e)}"
+
 
             # add the model's tool-call request AND the tool's result to the conversation
             contents.append(response.candidates[0].content)
@@ -57,7 +78,7 @@ def run_agent(user_query, max_iterations=5):
                 "parts": [{
                     "function_response": {
                         "name": fn_name,
-                        "response": {"result": result_text}
+                        "response": {"result": tool_result_text}
                     }
                 }]
             })

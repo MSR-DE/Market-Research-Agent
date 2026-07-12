@@ -2,6 +2,7 @@ import time
 from app.tools.rag_search import hybrid_search_reranked
 from app.agent.orchestrator import run_agent
 from app.ingestion.embedder import client
+from app.tools.rag_search import search_chunk
 
 test_set = [
 {"question": "How did Apple's stock perform recently?", "expected_article_id": 10},
@@ -11,6 +12,24 @@ test_set = [
 {"question": "How much could a $5,000 investment in SpaceX be worth by 2030?", "expected_article_id": 23},
 {"question": "What stocks should investors watch in Dow Jones futures trading?", "expected_article_id": 18},
 ]
+
+
+
+
+def eval_retrieval_baseline(test_set):
+    # BASELINE: pure vector search, no hybrid, no RRF, no rerank
+    correct = 0
+    for case in test_set:
+        results = search_chunk(case["question"], limit=3)
+        retrieved_ids = [r.article_id for r in results]
+        hit = case["expected_article_id"] in retrieved_ids
+        correct += hit
+        print(f"[{'PASS' if hit else 'FAIL'}] '{case['question']}' -> got {retrieved_ids}, expected {case['expected_article_id']}")
+
+    accuracy = correct / len(test_set)
+    print(f"\nBaseline (vector-only) retrieval accuracy: {accuracy:.0%} ({correct}/{len(test_set)})")
+    return accuracy
+
 
 
 def eval_retrieval(test_set): # measures RETRIEVAL QUALITY to check if did search actually find the right article
@@ -70,8 +89,11 @@ def eval_agent_answers(test_set):
 
 
 if __name__ == "__main__":
-    print("=== Retrieval Eval ===")
-    eval_retrieval(test_set)
+    '''print("=== Retrieval Eval ===")
+    eval_retrieval(test_set)'''
 
-    print("\n=== Agent Answer Quality Eval ===")
-    eval_agent_answers(test_set)
+    print("=== Baseline (Vector-Only) Eval ===")
+    eval_retrieval_baseline(test_set)
+
+    '''print("\n=== Agent Answer Quality Eval ===")
+    eval_agent_answers(test_set)'''
