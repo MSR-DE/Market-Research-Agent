@@ -1,11 +1,7 @@
 from google.genai import types
 from app.ingestion.embedder import client
 from app.tools.rag_search import hybrid_search_reranked
-import logging
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
-from google.api_core.exceptions import ResourceExhausted
-
-logger = logging.getLogger(__name__)
+import time
 
 
 search_tool_declaration = {
@@ -30,26 +26,16 @@ available_tools = {
     "search_news": lambda query: hybrid_search_reranked(query)
 }
 
-@retry(
-    retry=retry_if_exception_type(ResourceExhausted),
-    wait=wait_exponential(multiplier=2, min=2, max=120),
-    stop=stop_after_attempt(8),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
-)
-def _agent_generate(contents, tools):
-    """Wrapper so tenacity handles the 429s instead of a blind sleep."""
-    return client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=contents,
-        config=types.GenerateContentConfig(tools=tools)
-    )
-
 def run_agent(user_query, max_iterations=5):
     contents = [{"role": "user", "parts": [{"text": user_query}]}]
 
     for i in range(max_iterations):
-        response = _agent_generate(contents, [tool])
+        time.sleep(25)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(tools=[tool])
+        )
 
         part = response.candidates[0].content.parts[0]
 
@@ -90,6 +76,11 @@ def run_agent(user_query, max_iterations=5):
             return part.text
 
     return "Reached max iterations without a final answer."
+
+
+if __name__ == "__main__":
+    answer = run_agent("How is Apple's stock performing based on recent news?")
+    print("\nFinal answer:", answer)
 
 
 if __name__ == "__main__":

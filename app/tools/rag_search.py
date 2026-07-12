@@ -3,11 +3,7 @@ from app.models import Chunk
 from app.ingestion.embedder import embed_text
 from sqlalchemy import text
 from app.ingestion.embedder import client
-import logging
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type, before_sleep_log
-from google.api_core.exceptions import ResourceExhausted
-
-logger = logging.getLogger(__name__)
+import time
 
 
 ## cosine search
@@ -83,17 +79,6 @@ def hybrid_search(query, limit=5):
 
 ###-----------------------### 
 
-@retry(
-    retry=retry_if_exception_type(ResourceExhausted),
-    wait=wait_exponential(multiplier=2, min=2, max=120),
-    stop=stop_after_attempt(8),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    reraise=True,
-)
-def _generate_with_retry(prompt):
-    """Wrapper so tenacity handles the 429s instead of a blind sleep."""
-    return client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-
 def rerank(query, chunks, top_n=5):
     if not chunks:
         return[]
@@ -107,8 +92,9 @@ def rerank(query, chunks, top_n=5):
     Return ONLY a comma-separated list of chunk numbers, most relevant first. No explanation.
 
     {chunk_list}"""
+    time.sleep(25)   
 
-    response = _generate_with_retry(prompt)
+    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
 
     order = [int(i.strip()) for i in response.text.strip().split(",")]
     rerank = [chunks[i] for i in order if i<len(chunks)]
@@ -118,8 +104,6 @@ def rerank(query, chunks, top_n=5):
 def hybrid_search_reranked(query, limit=5):
     candidates = hybrid_search(query, limit=10)   # get more candidates than needed
     return rerank(query, candidates, top_n=limit)
-
-
 
 
 

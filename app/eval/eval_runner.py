@@ -89,11 +89,11 @@ def eval_agent_answers(test_set):
 
 
 if __name__ == "__main__":
-    '''print("=== Retrieval Eval ===")
-    eval_retrieval(test_set)'''
+    print("=== Retrieval Eval ===")
+    eval_retrieval(test_set)
 
     print("=== Baseline (Vector-Only) Eval ===")
     eval_retrieval_baseline(test_set)
 
-    '''print("\n=== Agent Answer Quality Eval ===")
-    eval_agent_answers(test_set)'''
+    print("\n=== Agent Answer Quality Eval ===")
+    eval_agent_answers(test_set)
