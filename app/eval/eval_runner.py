@@ -4,8 +4,12 @@ from app.agent.orchestrator import run_agent
 from app.ingestion.embedder import client
 
 test_set = [
-    {"question": "How did Apple's stock perform recently?", "expected_article_id": 10},
-    {"question": "What did the Federal Reserve decide about interest rates?", "expected_article_id": 11},
+{"question": "How did Apple's stock perform recently?", "expected_article_id": 10},
+{"question": "What did the Federal Reserve decide about interest rates?", "expected_article_id": 11},
+{"question": "What is Apple's lawsuit against OpenAI about?", "expected_article_id": 16},
+{"question": "What did Fed Governor Waller say about interest rate cuts?", "expected_article_id": 19},
+{"question": "How much could a $5,000 investment in SpaceX be worth by 2030?", "expected_article_id": 23},
+{"question": "What stocks should investors watch in Dow Jones futures trading?", "expected_article_id": 18},
 ]
 
 
