@@ -31,13 +31,21 @@ def run_agent(user_query, max_iterations=5):
 
     for i in range(max_iterations):
         time.sleep(25)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=contents,
-            config=types.GenerateContentConfig(tools=[tool])
-        )
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=types.GenerateContentConfig(tools=[tool])
+            )
+        except Exception as e:
+            print(f"[Agent] Gemini unavailable ({e}), falling back to raw search")
+            from app.tools.rag_search import search_chunk
+            fallback_results = search_chunk(user_query, limit=3)
+            fallback_text = "\n\n".join(chunk.chunk_text for chunk in fallback_results)
+            return f"AI reasoning unavailable right now. Here's the most relevant raw content I found:\n\n{fallback_text}"
 
         part = response.candidates[0].content.parts[0]
+
 
         # CASE 1: the model wants to call a tool
         if part.function_call:
@@ -83,9 +91,6 @@ if __name__ == "__main__":
     print("\nFinal answer:", answer)
 
 
-if __name__ == "__main__":
-    answer = run_agent("How is Apple's stock performing based on recent news?")
-    print("\nFinal answer:", answer)
 
 
 

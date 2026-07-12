@@ -106,8 +106,6 @@ def hybrid_search_reranked(query, limit=5):
     return rerank(query, candidates, top_n=limit)
 
 
-
-
 if __name__ == "__main__":
     matches = hybrid_search_reranked("Fed Reserve interest rate decision?")
     for chunk in matches:
