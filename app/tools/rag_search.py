@@ -1,9 +1,7 @@
 from app.ingestion.store import Session
 from app.models import Chunk
-from app.ingestion.embedder import embed_text
+from app.ingestion.embedder import embed_text, client, gemini_retry
 from sqlalchemy import text
-from app.ingestion.embedder import client
-import time
 
 
 ## cosine search
@@ -78,13 +76,17 @@ def hybrid_search(query, limit=5):
 
 
 ###-----------------------### 
+@gemini_retry   ## retries only on 429s with backoff
+def _call_reranker(prompt):
+    return client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+
 
 def rerank(query, chunks, top_n=5):
     if not chunks:
-        return[]
-    
+        return []
+
     ## build numbered list of chunk texts for the LLM to judge
-    chunk_list = "\n".join(f"[{i}] {chunk.chunk_text[:300]}" for i, chunk in enumerate(chunks)) 
+    chunk_list = "\n".join(f"[{i}] {chunk.chunk_text[:300]}" for i, chunk in enumerate(chunks))
 
     prompt = f"""Query: {query}
 
@@ -92,14 +94,21 @@ def rerank(query, chunks, top_n=5):
     Return ONLY a comma-separated list of chunk numbers, most relevant first. No explanation.
 
     {chunk_list}"""
-    time.sleep(25)   
 
-    response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    response = _call_reranker(prompt)
 
-    order = [int(i.strip()) for i in response.text.strip().split(",")]
-    rerank = [chunks[i] for i in order if i<len(chunks)]
-    return rerank[:top_n]
+    ## the LLM might not return clean "2,0,1" — it could say "Here are the rankings: 2, 0, 1"
+    ## or return garbage entirely. if parsing fails, fall back to the RRF order we already have.
+    try:
+        order = [int(i.strip()) for i in response.text.strip().split(",")]
+        reranked = [chunks[i] for i in order if i < len(chunks)]
+        if not reranked:                      ## parsed, but nothing valid came out
+            raise ValueError("no valid indices in reranker output")
+    except (ValueError, AttributeError) as e:
+        print(f"[Rerank] Could not parse LLM output ({e}), falling back to RRF order")
+        reranked = chunks                     ## RRF order is already a decent ranking
 
+    return reranked[:top_n]
 
 def hybrid_search_reranked(query, limit=5):
     candidates = hybrid_search(query, limit=10)   # get more candidates than needed

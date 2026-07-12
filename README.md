@@ -51,6 +51,7 @@ graph TD
 * **Google Gemini (GenAI SDK)**: `gemini-embedding-001` for 3072-dim embeddings, `gemini-2.5-flash` for reranking, agent reasoning, and answer generation via function-calling.
 * **Agentic tool-use**: the agent decides per-query whether to call the search tool, using Gemini's native function-calling API — not a hardcoded retrieval step.
 * **Eval harness**: hand-labeled retrieval accuracy test, LLM-as-judge answer quality scoring (checked against actual retrieved source material, not judged in isolation), and a baseline ablation comparing hybrid+RRF+rerank against naive vector search.
+* **Graceful degradation**: if the Gemini API is unavailable (rate limit, outage), the agent falls back to raw vector search results rather than crashing — verified live under an actual quota exhaustion.
 * **Docker & Docker Compose**: orchestrates PostgreSQL (with pgvector) and Redis.
 
 ---
@@ -144,6 +145,7 @@ python -m app.eval.eval_runner
 * **No deduplication** — two ingested articles are exact duplicates from overlapping NewsAPI search queries.
 * **Free-tier Gemini rate limits** materially slow batch eval runs (not an issue for normal single-query use, which makes 2-4 calls).
 * **Judge consistency not yet verified** — the LLM-as-judge hasn't been checked for score stability across repeated runs of the same case.
+* **Fallback mode has the same relevance-blindness as pure vector search** — when Gemini is unavailable, the fallback always returns the *closest available* content, even if nothing in the corpus is truly relevant to the query.
 
 ---
 
