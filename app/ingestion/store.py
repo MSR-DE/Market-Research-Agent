@@ -8,9 +8,31 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
-database_url = os.getenv("DATABASE_URL")
-engine = create_engine(database_url)
-Session = sessionmaker(bind=engine)
+
+_engine = None
+_session_factory = None
+
+
+def get_engine():
+    ## lazy, for the same reason the Gemini client is lazy: create_engine(None) raises, so
+    ## building it at module scope makes this file un-importable without a live DATABASE_URL.
+    ## that breaks CI and any unit test that only wants a pure function from a module that
+    ## happens to import this one.
+    global _engine
+    if _engine is None:
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError("DATABASE_URL is not set — check your .env")
+        _engine = create_engine(database_url)
+    return _engine
+
+
+def Session():
+    ## kept callable as Session() so every existing call site works unchanged
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = sessionmaker(bind=get_engine())
+    return _session_factory()
 
 
 def store_article(title, source_name, published_date, url, full_text):
