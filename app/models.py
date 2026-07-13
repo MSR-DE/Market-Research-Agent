@@ -16,7 +16,7 @@ class Article(Base):
 
     published_date = Column(DateTime, nullable=False) ## help filter for recent news/freshness
 
-    url = Column(String, nullable=True) ## not essential but nice to have
+    url = Column(String, unique=True, nullable=False) ## the natural key. NewsAPI returns the same article across overlapping queries, so the DB — not the caller — enforces "one row per article"
 
 
 ###--------------------------###

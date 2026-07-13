@@ -1,0 +1,25 @@
+# Secrets — must never be copied into an image layer.
+# Layers are immutable: deleting .env in a later RUN does NOT remove it from the image.
+.env
+*.env
+
+# Virtualenvs — host-built, wrong platform, and huge. The image builds its own deps.
+.venv/
+venv/
+
+# VCS + CI
+.git/
+.github/
+.gitignore
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Editor
+.vscode/
+
+# Docs
+README.md

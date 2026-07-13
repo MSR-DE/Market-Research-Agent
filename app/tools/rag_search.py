@@ -1,13 +1,13 @@
 from app.ingestion.store import Session
 from app.models import Chunk
-from app.ingestion.embedder import embed_text, client, gemini_retry
+from app.ingestion.embedder import embed_query, get_client, gemini_retry_fast
 from sqlalchemy import text
 
 
 ## cosine search
 def search_chunk(query, limit=5):
 
-    query_vector = embed_text(query) ## turning users query into a vector
+    query_vector = embed_query(query) ## turning the user's query into a vector — fast-degrade policy, a user is waiting
 
     session = Session()
 
@@ -76,9 +76,9 @@ def hybrid_search(query, limit=5):
 
 
 ###-----------------------### 
-@gemini_retry   ## retries only on 429s with backoff
+@gemini_retry_fast   ## also on the interactive path — and rerank already degrades safely to RRF order
 def _call_reranker(prompt):
-    return client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    return get_client().models.generate_content(model="gemini-2.5-flash", contents=prompt)
 
 
 def rerank(query, chunks, top_n=5):
@@ -95,17 +95,20 @@ def rerank(query, chunks, top_n=5):
 
     {chunk_list}"""
 
-    response = _call_reranker(prompt)
-
-    ## the LLM might not return clean "2,0,1" — it could say "Here are the rankings: 2, 0, 1"
-    ## or return garbage entirely. if parsing fails, fall back to the RRF order we already have.
+    ## two ways this can fail, and BOTH must degrade to RRF order rather than crash:
+    ##   1. the API call itself dies (429 quota, network, timeout)
+    ##   2. the call succeeds but returns unparseable text — "Here are the rankings: 2, 0, 1"
+    ##      instead of "2,0,1", or garbage entirely
+    ## reranking is an *optimisation* over RRF, not a requirement. if it's unavailable, the
+    ## RRF ordering is already a reasonable ranking, so we return that and keep serving.
     try:
+        response = _call_reranker(prompt)
         order = [int(i.strip()) for i in response.text.strip().split(",")]
         reranked = [chunks[i] for i in order if i < len(chunks)]
         if not reranked:                      ## parsed, but nothing valid came out
             raise ValueError("no valid indices in reranker output")
-    except (ValueError, AttributeError) as e:
-        print(f"[Rerank] Could not parse LLM output ({e}), falling back to RRF order")
+    except Exception as e:
+        print(f"[Rerank] Unavailable ({type(e).__name__}: {e}), falling back to RRF order")
         reranked = chunks                     ## RRF order is already a decent ranking
 
     return reranked[:top_n]

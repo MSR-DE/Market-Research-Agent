@@ -1,9 +1,22 @@
-.vscode/
-*.vscode
+# Secrets
+.env
 *.env
-*.db
-.env 
+
+# Virtualenvs
+.venv/
 venv/
-*.pyc
+env/
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# Editors
+.vscode/
+.idea/
+
+# Local DBs
+*.db
+*.sqlite3

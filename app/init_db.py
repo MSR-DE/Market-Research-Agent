@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 import os
 from dotenv import load_dotenv
-from models import Base   # imports Article and Chunk table definitions
+from app.models import Base   # imports Article and Chunk table definitions
 
 load_dotenv()
 

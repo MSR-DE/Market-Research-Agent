@@ -1,27 +1,73 @@
-version: "3.9"
-
 services:
   db:
-    image: pgvector/pgvector:pg16 # pg = postgreSQL 
+    image: pgvector/pgvector:pg16
     container_name: market-research-db
-    restart: always               # auto-restart everytime it crashes 
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: market_research
     ports:
-      - "5432:5432"  ## 5432 is the standard default for postgre like how 80 is for HTTP
+      - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data # persist data outside the container so it survives restarts
+      - pgdata:/var/lib/postgresql/data   # persist data outside the container so it survives restarts
+    healthcheck:
+      # depends_on only waits for the container to START, not for postgres to accept
+      # connections. without this, celery boots first and dies on connection refused.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d market_research"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
-    image: redis:8.8.0 
+    image: redis:8-alpine
     container_name: market-research-redis
-    restart: always               # auto-restart everytime it crashes 
+    restart: always
     ports:
-      - "6379:6379"  ## 6379 is the standard default for redis like how 80 is for HTTP and 5432 for postgres
+      - "6379:6379"
+    # no volume: redis is only the celery broker here, not a system of record.
+    # if it loses its queue on restart, we re-run ingestion. nothing durable lives here.
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
-                      # redis doesnt need persistant volume becasue its a message broker not a data storer or somthign
+  app:
+    build: .
+    container_name: market-research-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      # override the .env values, which point at localhost for running natively.
+      # inside compose, "localhost" is THIS container — postgres and redis are reachable
+      # by their service names on the shared compose network.
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/market_research
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8501:8501"
+
+  celery:
+    build: .
+    container_name: market-research-worker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/market_research
+      REDIS_URL: redis://redis:6379/0
+    command: celery -A app.celery_app worker --loglevel=info
 
 volumes:
   pgdata:

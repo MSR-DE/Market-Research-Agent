@@ -1,5 +1,5 @@
 from google.genai import types
-from app.ingestion.embedder import client, gemini_retry
+from app.ingestion.embedder import get_client, gemini_retry_fast
 from app.tools.rag_search import hybrid_search_reranked
 
 
@@ -26,9 +26,9 @@ available_tools = {
 }
 
 
-@gemini_retry   ## retries ONLY on 429s, with exponential backoff
+@gemini_retry_fast   ## interactive path: a live user is waiting, so degrade fast rather than stall
 def _call_model(contents):
-    return client.models.generate_content(
+    return get_client().models.generate_content(
         model="gemini-2.5-flash",
         contents=contents,
         config=types.GenerateContentConfig(tools=[tool])
@@ -45,7 +45,15 @@ def run_agent(user_query, max_iterations=5):
             print(f"[Agent] Gemini unavailable ({e}), falling back to raw search")
             from app.tools.rag_search import search_chunk
             fallback_results = search_chunk(user_query, limit=3)
-            fallback_text = "\n\n".join(chunk.chunk_text for chunk in fallback_results)
+            ## dedupe before joining. chunks overlap by design, and near-identical chunks from
+            ## the same story would otherwise render as the same paragraph three times over.
+            seen = set()
+            unique_texts = []
+            for chunk in fallback_results:
+                if chunk.chunk_text not in seen:
+                    seen.add(chunk.chunk_text)
+                    unique_texts.append(chunk.chunk_text)
+            fallback_text = "\n\n".join(unique_texts)
             return f"AI reasoning unavailable right now. Here's the most relevant raw content I found:\n\n{fallback_text}"
 
         part = response.candidates[0].content.parts[0]

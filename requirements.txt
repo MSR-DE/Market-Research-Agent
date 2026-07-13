@@ -1,4 +1,4 @@
-﻿altair==6.2.2
+altair==6.2.2
 amqp==5.3.1
 annotated-types==0.7.0
 anyio==4.14.1
@@ -74,3 +74,4 @@ vine==5.1.0
 watchdog==6.0.0
 wcwidth==0.8.2
 websockets==16.0
+pytest==8.3.4

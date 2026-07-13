@@ -1,6 +1,6 @@
 from app.tools.rag_search import hybrid_search_reranked, search_chunk
 from app.agent.orchestrator import run_agent
-from app.ingestion.embedder import client, embed_text, gemini_retry
+from app.ingestion.embedder import get_client, embed_text, gemini_retry
 from app.ingestion.store import Session
 from app.models import Chunk, Article
 
@@ -112,7 +112,7 @@ def eval_no_answer_cases(no_answer_set, distance_threshold=0.7):
 
 @gemini_retry   ## retries only on 429s with backoff — no blind sleeping
 def _call_judge(prompt):
-    return client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
+    return get_client().models.generate_content(model="gemini-2.5-flash", contents=prompt)
 
 
 def llm_judge(question, answer, source_chunks):  ## LLM-AS-JUDGE — scores the answer against its actual source material
