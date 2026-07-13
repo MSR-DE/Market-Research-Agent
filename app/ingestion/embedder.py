@@ -12,12 +12,12 @@ client = genai.Client(api_key=gemini_api_key)
 
 def is_rate_limit(exception):
     # only retry on rate limits — a 404 or bad request will never succeed no matter how long we wait.
-    # google-genai's ClientError exposes .status (a string like "RESOURCE_EXHAUSTED"), not a numeric code.
+    # google-genai's ClientError exposes .status (a string like "RESOURCE_EXHAUSTED"), NOT a numeric code.
     if not isinstance(exception, ClientError):
         return False
     if getattr(exception, "status", None) == "RESOURCE_EXHAUSTED":
         return True
-    return "429" in str(exception)   ## belt-and-braces: the message always carries the code
+    return "429" in str(exception)   ## fallback: the message always carries the code
 
 
 gemini_retry = retry(

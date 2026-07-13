@@ -139,11 +139,11 @@ python -m app.eval.eval_runner
 
 The test set is 11 hand-labeled questions plus a separate no-answer set. It deliberately includes cases designed to separate hybrid search from the vector-only baseline: a paraphrased query with none of the source article's key terms, an exact-number query ("4.10% APY") that should favor keyword search, and a duplicate-article case where either copy counts as a hit.
 
-<!-- TODO(mohit): rerun `python -m app.eval.eval_runner` on the current 11-question set and fill these in. Do NOT push with this comment still here. -->
-* **Retrieval accuracy (hybrid + RRF + rerank)**: X/11
-* **Baseline (vector-only) retrieval accuracy**: X/11
-* **No-answer detection**: X/1
-* **Answer quality**: X/5 average, LLM-judged against the actual retrieved source material rather than judged in isolation
+<!-- last run: today, on the current 11-question set -->
+* **Retrieval accuracy (hybrid + RRF + rerank)**: 11/11 (100%)
+* **Baseline (vector-only) retrieval accuracy**: 11/11 (100%) — tied with hybrid on hit-rate, though hybrid tightened ranking position on several ambiguous cases (one query went from a 3-candidate spread down to a single confident match). At this corpus size, vector search alone is already strong enough to place the right article in the top 3; a larger, noisier corpus would be a better test of hybrid's actual advantage.
+* **No-answer detection**: 0/1 — a query entirely outside the corpus ("What is Tesla's current stock price?") returned a closest cosine distance of 0.342 against a 0.7 threshold, meaning pure vector search still surfaced confident-looking results for a topic the corpus has nothing on.
+* **Answer quality**: partial (2/5 and 5/5 on the first two cases; free-tier rate limits interrupted the run before the remaining 9). Full run pending billing setup — see Known limitations.
 
 ---
 
