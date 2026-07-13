@@ -8,8 +8,7 @@
 
 An agentic RAG system for financial news research. Given a question, the agent decides for itself — through real function-calling, not a scripted retrieval step — whether it needs to search a corpus of ingested news articles. Retrieval is hybrid (vector + keyword) fused with Reciprocal Rank Fusion and reranked by an LLM, and answers are grounded in what was actually retrieved.
 
-The part I care most about: it ships with an eval harness. Retrieval accuracy against a hand-labeled test set, an ablation against a naive vector-search baseline, no-answer detection, and LLM-as-judge answer scoring. Most RAG demos skip this entirely, which means their authors have no idea whether the fancy retrieval stack is doing anything. I wanted to know.
-
+The part I care most about: it ships with an eval harness. Retrieval accuracy against a hand-labeled test set, an ablation against a naive vector-search baseline, no-answer detection, and LLM-as-judge answer scoring. Most RAG demos skip this entirely.
 ---
 
 ## Architecture

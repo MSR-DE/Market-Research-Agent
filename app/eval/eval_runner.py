@@ -2,22 +2,22 @@ from app.tools.rag_search import hybrid_search_reranked, search_chunk
 from app.agent.orchestrator import run_agent
 from app.ingestion.embedder import client, embed_text, gemini_retry
 from app.ingestion.store import Session
-from app.models import Chunk
+from app.models import Chunk, Article
 
 # python -m app.eval.eval_runner
 
 test_set = [
-    {"question": "How did Apple's stock perform recently?", "expected_article_id": 10},
-    {"question": "What did the Federal Reserve decide about interest rates?", "expected_article_id": 11},
-    {"question": "What is Apple's lawsuit against OpenAI about?", "expected_article_id": 16},
-    {"question": "What did Fed Governor Waller say about interest rate cuts?", "expected_article_id": 19},
-    {"question": "How much could a $5,000 investment in SpaceX be worth by 2030?", "expected_article_id": 23},
-    {"question": "What stocks should investors watch in Dow Jones futures trading?", "expected_article_id": 18},
-    {"question": "What did a Federal Reserve official say about cutting interest rates?", "expected_article_id": 19},  # paraphrase test — no exact "Waller" or "Governor" terms
-    {"question": "What was the CD account interest rate mentioned recently?", "expected_article_id": 20},  # specific number/term test — should favor keyword search
-    {"question": "What was the 'LOL' moment mentioned in the OpenAI engineer story?", "expected_article_id": [13, 15]},  # duplicate articles — either counts as correct
-    {"question": "What's going on between Apple and OpenAI?", "expected_article_id": 16},
-    {"question": "4.10% APY", "expected_article_id": 20},
+    {"question": "How did Apple's stock perform recently?", "expected_url": "https://example.com/apple-earnings"},
+    {"question": "What did the Federal Reserve decide about interest rates?", "expected_url": "https://example.com/fed-rates"},
+    {"question": "What is Apple's lawsuit against OpenAI about?", "expected_url": "https://www.breitbart.com/tech/2026/07/11/at-every-level-apple-lawsuit-accuses-openai-of-stealing-trade-secrets-in-massive-scheme/"},
+    {"question": "What did Fed Governor Waller say about interest rate cuts?", "expected_url": "https://cryptobriefing.com/fed-waller-challenges-trump-rate-cuts/"},
+    {"question": "How much could a $5,000 investment in SpaceX be worth by 2030?", "expected_url": "https://biztoc.com/x/eb5ba56aa3b68796"},
+    {"question": "What stocks should investors watch in Dow Jones futures trading?", "expected_url": "https://biztoc.com/x/5db22f33fe09663b"},
+    {"question": "What did a Federal Reserve official say about cutting interest rates?", "expected_url": "https://cryptobriefing.com/fed-waller-challenges-trump-rate-cuts/"},
+    {"question": "What was the CD account interest rate mentioned recently?", "expected_url": "https://biztoc.com/x/8c3d3e8e454db079"},
+    {"question": "What was the 'LOL' moment mentioned in the OpenAI engineer story?", "expected_urls": ["https://biztoc.com/x/31a88727ac4dba83", "https://fortune.com/2026/07/11/openai-engineers-legal-fight-apple-ai-product-poaching/"]},
+    {"question": "What's going on between Apple and OpenAI?", "expected_url": "https://www.breitbart.com/tech/2026/07/11/at-every-level-apple-lawsuit-accuses-openai-of-stealing-trade-secrets-in-massive-scheme/"},
+    {"question": "4.10% APY", "expected_url": "https://biztoc.com/x/8c3d3e8e454db079"},
 ]
 
 # separate list: questions with NO correct answer in the corpus.
@@ -27,21 +27,33 @@ no_answer_set = [
 ]
 
 
+def get_article_urls(article_ids):
+    # maps retrieved article_ids back to their urls, so eval compares by URL (stable across machines)
+    # rather than by database id (specific to this local Postgres instance).
+    session = Session()
+    rows = session.query(Article.id, Article.url).filter(Article.id.in_(article_ids)).all()
+    session.close()
+    return {row.id: row.url for row in rows}
+
+
 def eval_retrieval_baseline(test_set):
     # BASELINE: pure vector search, no hybrid, no RRF, no rerank
     correct = 0
     for case in test_set:
         results = search_chunk(case["question"], limit=3)
         retrieved_ids = [r.article_id for r in results]
-        expected = case["expected_article_id"]
+        url_map = get_article_urls(retrieved_ids)
+        retrieved_urls = [url_map.get(aid) for aid in retrieved_ids]
 
-        if isinstance(expected, list):
-            hit = any(e in retrieved_ids for e in expected)
+        if "expected_urls" in case:
+            hit = any(u in retrieved_urls for u in case["expected_urls"])
+            expected = case["expected_urls"]
         else:
-            hit = expected in retrieved_ids
+            hit = case["expected_url"] in retrieved_urls
+            expected = case["expected_url"]
         correct += hit
 
-        print(f"[{'PASS' if hit else 'FAIL'}] '{case['question']}' -> got {retrieved_ids}, expected {expected}")
+        print(f"[{'PASS' if hit else 'FAIL'}] '{case['question']}' -> got {retrieved_urls}, expected {expected}")
 
     accuracy = correct / len(test_set)
     print(f"\nBaseline (vector-only) retrieval accuracy: {accuracy:.0%} ({correct}/{len(test_set)})")
@@ -53,15 +65,18 @@ def eval_retrieval(test_set):  # measures RETRIEVAL QUALITY to check if search a
     for case in test_set:
         results = hybrid_search_reranked(case["question"], limit=3)
         retrieved_ids = [r.article_id for r in results]  ## what IDs actually came back
-        expected = case["expected_article_id"]
+        url_map = get_article_urls(retrieved_ids)
+        retrieved_urls = [url_map.get(aid) for aid in retrieved_ids]
 
-        if isinstance(expected, list):
-            hit = any(e in retrieved_ids for e in expected)
+        if "expected_urls" in case:
+            hit = any(u in retrieved_urls for u in case["expected_urls"])
+            expected = case["expected_urls"]
         else:
-            hit = expected in retrieved_ids
+            hit = case["expected_url"] in retrieved_urls
+            expected = case["expected_url"]
         correct += hit  # True/False acts like 1/0 when added to a number
 
-        print(f"[{'PASS' if hit else 'FAIL'}] '{case['question']}' -> got {retrieved_ids}, expected {expected}")
+        print(f"[{'PASS' if hit else 'FAIL'}] '{case['question']}' -> got {retrieved_urls}, expected {expected}")
 
     accuracy = correct / len(test_set)
     print(f"\nRetrieval accuracy: {accuracy:.0%} ({correct}/{len(test_set)})")
@@ -138,6 +153,10 @@ def eval_agent_answers(test_set):
 
         scores.append(score)
         print(f"[{score}/5] '{case['question']}'")
+
+    if not scores:                                ## every judge call failed to parse — nothing to average
+        print("\nAverage answer quality: N/A (no cases produced a usable judge score)")
+        return None
 
     avg = sum(scores) / len(scores)
     print(f"\nAverage answer quality: {avg:.1f}/5 (over {len(scores)} scored cases)")
