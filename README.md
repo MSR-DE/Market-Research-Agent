@@ -10,6 +10,19 @@
 An agentic RAG system for financial news research. Given a question, the agent decides for itself — through real function-calling, not a scripted retrieval step — whether it needs to search a corpus of ingested news articles. Retrieval is hybrid (vector + keyword) fused with Reciprocal Rank Fusion and reranked by an LLM, and answers are grounded in what was actually retrieved.
 
 The part I care most about: it ships with an eval harness. Retrieval accuracy against a hand-labeled test set, an ablation against a naive vector-search baseline, no-answer detection, and LLM-as-judge answer scoring. Most RAG demos skip this entirely.
+
+---
+
+## What it looks like
+
+**The agent decides to search.** A question it can't answer from parameters triggers a tool call — and note that it rewrote the query on its way in ("SNP500" became "S&P 500 sentiment"). The answer that comes back is grounded in the articles it retrieved, not in the model's own recollection.
+
+![The agent calls the search tool and answers from retrieved articles](docs/images/agent-searches.png)
+
+**And it decides *not* to search.** Given a query that means nothing, it asks for clarification instead of returning three confidently-retrieved chunks of noise. This is the whole reason the agent uses function-calling rather than a scripted retrieve-then-answer chain: a chain would have embedded the gibberish and dutifully returned the nearest thing it found.
+
+![The agent declines to search a meaningless query and asks for clarification](docs/images/agent-declines.png)
+
 ---
 
 ## Architecture
@@ -142,6 +155,7 @@ Or with the UI:
 ```bash
 streamlit run app/ui.py
 ```
+Then open **http://localhost:8501**.
 
 ### 6. Run the eval harness
 ```bash
